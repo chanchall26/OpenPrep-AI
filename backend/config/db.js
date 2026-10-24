@@ -1,5 +1,7 @@
 const { Sequelize } = require('sequelize');
 const { Pool } = require('pg');
+const { resolvePoolConfig } = require('./poolConfig');
+const { attachSequelizeTelemetry } = require('../services/dbQueryTelemetry');
 
 const dbUrl = process.env.DATABASE_URL;
 if (!dbUrl) {
@@ -32,12 +34,7 @@ const sequelize = new Sequelize(
   {
     dialect: 'postgres',
     logging: process.env.NODE_ENV === 'development' ? console.log : false,
-    pool: {
-      max: parseInt(process.env.DB_POOL_MAX, 10) || 20,
-      min: parseInt(process.env.DB_POOL_MIN, 10) || 5,
-      acquire: parseInt(process.env.DB_POOL_ACQUIRE, 10) || 30000,
-      idle: parseInt(process.env.DB_POOL_IDLE, 10) || 30000,
-    },
+    pool: resolvePoolConfig(),
     dialectOptions: {
       ssl: dbUrl.includes('supabase.co') || (process.env.NODE_ENV === 'production' && !dbUrl.includes('localhost'))
         ? { require: true, rejectUnauthorized: false }
@@ -70,6 +67,15 @@ sequelize.addHook('afterQuery', (options) => {
     const duration = (Date.now() - options.queryStartTime) / 1000;
     const { recordDbQueryDuration } = require('../services/metricsService');
     recordDbQueryDuration(duration);
+  }
+});
+
+// Slow query logging (>150ms by default) and latency samples for the health endpoint
+attachSequelizeTelemetry(sequelize, (ms) => {
+  try {
+    require('../services/poolManagerService').recordLatency(ms);
+  } catch (_) {
+    /* telemetry must never break a query */
   }
 });
 

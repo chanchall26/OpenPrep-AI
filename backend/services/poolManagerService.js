@@ -1,4 +1,4 @@
-const { pgPool, sequelize } = require('../config/db');
+const { sequelize } = require('../config/db');
 
 class PoolManagerService {
   constructor() {
@@ -42,11 +42,27 @@ class PoolManagerService {
    * Inspects current connection pool state
    */
   getPoolStats() {
+    // Sequelize's pool is the one real queries use (pgPool is migrations only)
+    const sp = sequelize.connectionManager && sequelize.connectionManager.pool;
+    const total = sp ? sp.size || 0 : 0;
+    const active = sp ? sp.using || 0 : 0;
+    const idle = sp ? sp.available || 0 : 0;
+    const waiting = sp ? sp.waiting || 0 : 0;
+    const max = (sequelize.options.pool && sequelize.options.pool.max) || 0;
+    try {
+      require('./metricsService').openprepDbPoolActiveConnections.set(active);
+    } catch (_) {
+      /* gauge is best effort */
+    }
     return {
       pool: {
-        totalCount: pgPool ? pgPool.totalCount : 0,
-        idleCount: pgPool ? pgPool.idleCount : 0,
-        waitingCount: pgPool ? pgPool.waitingCount : 0,
+        totalCount: total,
+        activeCount: active,
+        idleCount: idle,
+        waitingCount: waiting,
+        queueLength: waiting,
+        maxCount: max,
+        saturated: max > 0 && active >= max && waiting > 0,
       },
       circuitBreaker: {
         state: this.circuitState,

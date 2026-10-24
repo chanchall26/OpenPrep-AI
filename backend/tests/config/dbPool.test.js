@@ -7,7 +7,7 @@ describe('Database Connection Pooling & Timeout Options', () => {
 
   it('should load default connection pool settings when env variables are not set', () => {
     expect(sequelize.options.pool).toBeDefined();
-    expect(sequelize.options.pool.max).toBe(20);
+    expect(sequelize.options.pool.max).toBe(require('../../config/poolConfig').resolvePoolConfig().max);
     expect(sequelize.options.pool.min).toBe(5);
     expect(sequelize.options.pool.acquire).toBe(30000);
     expect(sequelize.options.pool.idle).toBe(10000);

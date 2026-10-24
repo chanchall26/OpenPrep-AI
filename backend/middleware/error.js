@@ -27,6 +27,20 @@ const errorHandler = (err, req, res, next) => {
     err,
   });
 
+  // Pool exhausted: shed load with 503 + Retry-After instead of a generic 500
+  if (err.name === 'SequelizeConnectionAcquireTimeoutError') {
+    return res
+      .status(503)
+      .set('Retry-After', '5')
+      .json(
+        withRequestId(req, {
+          success: false,
+          message: 'Service temporarily busy. Please retry shortly.',
+          error: 'Database connection pool exhausted',
+        })
+      );
+  }
+
   // Sequelize validation error — model-level validation failures
   if (err.name === 'SequelizeValidationError') {
     const message = err.errors.map((val) => val.message).join(', ');

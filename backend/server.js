@@ -581,6 +581,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // Health Check Routes
+app.get('/api/health/db', require('./controllers/dbHealthController').getDatabaseHealth);
 app.get(['/api/v1/health', '/api/health'], async (req, res) => {
   try {
     const { sequelize } = require('./config/db');
